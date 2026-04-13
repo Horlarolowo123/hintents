@@ -4,13 +4,13 @@ go 1.25.0
 
 require (
 	github.com/atotto/clipboard v0.1.4
-	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/fatih/color v1.19.0
 	github.com/getsentry/sentry-go v0.31.1
 	github.com/google/pprof v0.0.0-20250317173921-a4b03ec1a45e
 	github.com/gorilla/rpc v1.2.1
 	github.com/hashicorp/go-version v1.8.0
-	github.com/mattn/go-isatty v0.0.20
+	github.com/klauspost/compress v1.18.0
+	github.com/mattn/go-isatty v0.0.21
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
 	github.com/stellar/go-stellar-sdk v0.1.0
@@ -20,11 +20,13 @@ require (
 	go.opentelemetry.io/otel/sdk v1.37.0
 	go.opentelemetry.io/otel/trace v1.42.0
 	modernc.org/sqlite v1.44.3
+	pgregory.net/rapid v1.2.0
 )
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-chi/chi v4.1.2+incompatible // indirect
@@ -35,7 +37,6 @@ require (
 	github.com/gorilla/schema v1.4.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/manucorporat/sse v0.0.0-20160126180136-ee05b128a739 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
@@ -69,5 +70,4 @@ require (
 	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	pgregory.net/rapid v1.2.0 // indirect
 )
