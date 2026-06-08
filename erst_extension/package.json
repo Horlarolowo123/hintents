@@ -85,7 +85,7 @@
         "test": "node ./out/test/runTest.js"
     },
     "dependencies": {
-        "vscode-jsonrpc": "^8.2.1"
+        "vscode-jsonrpc": "^9.0.0"
     },
     "devDependencies": {
         "@types/vscode": "^1.90.0",
@@ -107,7 +107,7 @@
     "test:unit": "npm run compile && node --test out/traceExport.test.js"
   },
   "dependencies": {
-    "vscode-jsonrpc": "^8.2.1"
+    "vscode-jsonrpc": "^9.0.0"
   },
   "devDependencies": {
     "@types/vscode": "^1.90.0",
