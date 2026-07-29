@@ -10,6 +10,7 @@ mod events;
 mod gas_optimizer;
 mod git_detector;
 mod ipc;
+mod profiler;
 mod runner;
 mod snapshot;
 mod source_map_cache;
@@ -77,6 +78,7 @@ fn send_error(msg: String) {
         wasm_offset: None,
         linear_memory_dump: None,
         asset_anomalies: vec![],
+        pprof_profile: None,
     };
     if let Ok(json) = serde_json::to_string(&res) {
         println!("{}", json);
@@ -361,8 +363,14 @@ fn main() {
 
     tracing::info!(event = "simulator_started", "Simulator initializing...");
 
+    let mut pprof_guard = profiler::PprofGuard::start(99);
+
+
     let mut buffer = String::new();
     if let Err(e) = io::stdin().read_to_string(&mut buffer) {
+        let pprof_b64 = pprof_guard
+            .stop()
+            .map(|bytes| base64::engine::general_purpose::STANDARD.encode(&bytes));
         let res = SimulationResponse {
             status: "error".to_string(),
             error: Some(format!("Failed to read stdin: {e}")),
@@ -381,6 +389,7 @@ fn main() {
             wasm_offset: None,
             linear_memory_dump: None,
             asset_anomalies: vec![],
+            pprof_profile: pprof_b64,
         };
         tracing::error!("Failed to read stdin: {}", e);
         if let Ok(json) = serde_json::to_string(&res) {
@@ -395,6 +404,9 @@ fn main() {
     let request: SimulationRequest = match serde_json::from_str(&buffer) {
         Ok(req) => req,
         Err(e) => {
+            let pprof_b64 = pprof_guard
+                .stop()
+                .map(|bytes| base64::engine::general_purpose::STANDARD.encode(&bytes));
             let res = SimulationResponse {
                 status: "error".to_string(),
                 error: Some(format!("Invalid JSON: {e}")),
@@ -413,6 +425,7 @@ fn main() {
                 wasm_offset: None,
                 linear_memory_dump: None,
                 asset_anomalies: vec![],
+                pprof_profile: pprof_b64,
             };
             println!(
                 "{}",
@@ -604,6 +617,18 @@ fn main() {
         None
     };
 
+    let mut pprof_profile_b64 = None;
+    if let Some(ref output_path) = request.pprof_output_path {
+        if let Some(bytes) = pprof_guard.stop() {
+            if let Err(e) = profiler::PprofGuard::write_file(&bytes, output_path.as_ref()) {
+                eprintln!("Failed to write pprof file: {e}");
+            } else {
+                tracing::info!(event = "pprof_written", path = %output_path, "pprof profile written");
+                pprof_profile_b64 = Some(base64::engine::general_purpose::STANDARD.encode(&bytes));
+            }
+        }
+    }
+
     let mut flamegraph_svg = None;
     if request.profile.unwrap_or(false) {
         let folded_data = format!("Total;CPU {}\nTotal;Memory {}\n", cpu_insns, mem_bytes);
@@ -785,6 +810,7 @@ fn main() {
                         wasm_offset: None,
                         linear_memory_dump: None,
                         asset_anomalies: vec![],
+                        pprof_profile: pprof_profile_b64.clone(),
                     };
 
                     if let Ok(json) = serde_json::to_string(&response) {
@@ -819,6 +845,7 @@ fn main() {
                     .and_then(|m| m.map_wasm_offset_to_source(0)),
                 linear_memory_dump: None,
                 asset_anomalies: asset_tracker.finalize(),
+                pprof_profile: pprof_profile_b64.clone(),
             };
 
             if let Ok(json) = serde_json::to_string(&response) {
@@ -968,6 +995,7 @@ fn main() {
                 wasm_offset,
                 linear_memory_dump: None,
                 asset_anomalies: vec![],
+                pprof_profile: pprof_profile_b64.clone(),
             };
             if let Ok(json) = serde_json::to_string(&response) {
                 println!("{}", json);
@@ -1031,6 +1059,7 @@ fn main() {
                 wasm_offset: None,
                 linear_memory_dump: None,
                 asset_anomalies: vec![],
+                pprof_profile: pprof_profile_b64.clone(),
             };
             if let Ok(json) = serde_json::to_string(&response) {
                 println!("{}", json);

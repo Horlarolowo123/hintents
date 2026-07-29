@@ -522,6 +522,7 @@ mod contract_execution_tests {
             restore_preamble: None,
             include_linear_memory: false,
             enable_asset_safety: false,
+            pprof_output_path: None,
         };
         let result = execute_operations(&host, &operations, &request, None, &mut coverage);
         assert!(result.is_ok());
