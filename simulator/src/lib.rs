@@ -7,6 +7,7 @@ pub mod asset_tracker;
 pub mod context;
 pub mod gas_optimizer;
 pub mod git_detector;
+pub mod host;
 pub mod hsm;
 pub mod ipc;
 pub mod memory;

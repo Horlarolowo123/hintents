@@ -14,11 +14,10 @@
 //!
 //! The [`HostSnapshotTracker`] optionally integrates an [`AllocTracker`] that
 //! records the `Budget` memory consumption at each before-snapshot and validates
-//! consistency after rollback.  See [`crate::memory::AllocTracker`] for details.
+//! consistency after rollback.
 
 #![allow(dead_code)]
 
-use crate::memory::AllocTracker;
 use crate::snapshot::LedgerSnapshot;
 use std::fmt;
 
@@ -60,6 +59,103 @@ pub struct CapturedSnapshot {
     pub before_id: Option<SnapshotId>,
     /// Whether the host function trapped (only meaningful for After snapshots).
     pub trapped: bool,
+}
+
+/// Tracks allocator state across snapshot-and-rollback cycles.
+///
+/// Each snapshot checkpoint records the `Budget` memory consumption at that point.
+/// A subsequent rollback resets the expected baseline; the tracker verifies that
+/// the new `Host` starts with the correct allocator state.
+///
+/// # Debug-mode invariant checks
+///
+/// In debug builds the tracker runs lightweight assertions on every operation:
+/// - Snapshot count always ≥ rollback count.
+/// - Memory consumption stays within a sane range.
+#[derive(Debug, Clone)]
+pub struct AllocTracker {
+    /// Memory bytes consumed by the Budget at the last snapshot.
+    snapshotted_memory_bytes: u64,
+    /// Number of snapshot operations performed.
+    snapshot_count: u64,
+    /// Number of rollback operations performed.
+    rollback_count: u64,
+}
+
+impl AllocTracker {
+    /// Creates a new tracker with zero-initialized state.
+    pub fn new() -> Self {
+        Self {
+            snapshotted_memory_bytes: 0,
+            snapshot_count: 0,
+            rollback_count: 0,
+        }
+    }
+
+    /// Records a snapshot of the current memory consumption.
+    ///
+    /// Call this just **before** capturing a ledger snapshot so that
+    /// the tracker remembers the baseline memory state.
+    ///
+    /// # Arguments
+    /// * `memory_bytes` – The current Budget memory consumption
+    ///   (obtained via [`Budget::get_mem_bytes_consumed`]).
+    pub fn snapshot(&mut self, memory_bytes: u64) {
+        self.snapshotted_memory_bytes = memory_bytes;
+        self.snapshot_count = self.snapshot_count.saturating_add(1);
+        debug_assert!(
+            self.snapshot_count >= self.rollback_count,
+            "snapshot count must always >= rollback count"
+        );
+    }
+
+    /// Records a rollback operation and resets the baseline.
+    ///
+    /// Call this **after** [`SimHost::restore_from_snapshot`] has completed
+    /// and the new `Host` is in place.
+    ///
+    /// # Arguments
+    /// * `restored_memory_bytes` – The memory consumption of the newly restored
+    ///   `Host`'s Budget (expected to be 0 after a fresh construction).
+    pub fn record_rollback(&mut self, restored_memory_bytes: u64) {
+        self.rollback_count = self.rollback_count.saturating_add(1);
+        // The restored Host has a fresh Budget — consumption should be zero.
+        debug_assert!(
+            restored_memory_bytes == 0,
+            "restored Host budget should start at 0 consumption, got {restored_memory_bytes}"
+        );
+    }
+
+    /// Returns the memory bytes recorded at the last snapshot.
+    pub fn snapshotted_memory_bytes(&self) -> u64 {
+        self.snapshotted_memory_bytes
+    }
+
+    /// Returns the total number of snapshot operations.
+    pub fn snapshot_count(&self) -> u64 {
+        self.snapshot_count
+    }
+
+    /// Returns the total number of rollback operations.
+    pub fn rollback_count(&self) -> u64 {
+        self.rollback_count
+    }
+
+    /// Returns `true` if at least one rollback has been performed.
+    pub fn has_rolled_back(&self) -> bool {
+        self.rollback_count > 0
+    }
+
+    /// Returns the net number of un-rolled-back snapshots.
+    pub fn net_snapshots(&self) -> u64 {
+        self.snapshot_count.saturating_sub(self.rollback_count)
+    }
+}
+
+impl Default for AllocTracker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Manages snapshot capture around host function calls.

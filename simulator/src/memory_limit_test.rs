@@ -9,7 +9,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::memory::AllocTracker;
+    use crate::host::AllocTracker;
     use crate::runner::SimHost;
 
     #[test]

@@ -28,7 +28,7 @@ use base64::Engine as _;
 use soroban_env_host::xdr::{ReadXdr, WriteXdr};
 use soroban_env_host::{
     xdr::{Operation, OperationBody},
-    Host, HostError,
+    HostError,
 };
 use std::collections::HashMap;
 use std::env;
@@ -142,19 +142,6 @@ fn generate_lcov_report(coverage: &CoverageTracker, source_file: &str) -> String
     report
 }
 
-fn check_memory_limit_or_panic(host: &Host, memory_limit: Option<u64>) {
-    if let Some(limit) = memory_limit {
-        if let Ok(mem_bytes) = host.budget_cloned().get_mem_bytes_consumed() {
-            if mem_bytes > limit {
-                panic!(
-                    "{}: consumed {} bytes, limit {} bytes",
-                    ERR_MEMORY_LIMIT_EXCEEDED, mem_bytes, limit
-                );
-            }
-        }
-    }
-}
-
 fn load_ledger_entries(
     sim_host: &mut runner::SimHost,
     entries: &HashMap<String, String>,
@@ -174,14 +161,13 @@ fn load_ledger_entries(
 }
 
 fn execute_operations(
-    host: &Host,
+    sim_host: &mut runner::SimHost,
     operations: &[Operation],
     request: &SimulationRequest,
-    memory_limit: Option<u64>,
     coverage: &mut CoverageTracker,
 ) -> Result<Vec<String>, HostError> {
     let mut logs = Vec::new();
-    check_memory_limit_or_panic(host, memory_limit);
+    sim_host.check_memory_limit();
     for op in operations {
         coverage.record_operation(op);
         match &op.body {
@@ -201,16 +187,16 @@ fn execute_operations(
                     }
                 }
 
-                let val = host.invoke_function(invoke_op.host_function.clone())?;
+                let val = sim_host.inner.invoke_function(invoke_op.host_function.clone())?;
                 logs.push(format!("Result: {val:?}"));
-                check_memory_limit_or_panic(host, memory_limit);
+                sim_host.check_memory_limit();
             }
             _ => {
                 logs.push(format!(
                     "Skipping non-Soroban operation: {:?}",
                     op.body.name()
                 ));
-                check_memory_limit_or_panic(host, memory_limit);
+                sim_host.check_memory_limit();
             }
         }
     }
@@ -554,8 +540,6 @@ fn main() {
             }
         }
     }
-    let host = &sim_host.inner;
-
     let operations = match &envelope {
         soroban_env_host::xdr::TransactionEnvelope::Tx(tx_v1) => &tx_v1.tx.operations,
         soroban_env_host::xdr::TransactionEnvelope::TxV0(tx_v0) => &tx_v0.tx.operations,
@@ -568,15 +552,14 @@ fn main() {
     let mut coverage = CoverageTracker::default();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         execute_operations(
-            host,
+            &mut sim_host,
             operations,
             &request,
-            request.memory_limit,
             &mut coverage,
         )
     }));
 
-    let budget = host.budget_cloned();
+    let budget = sim_host.inner.budget_cloned();
     let cpu_insns = budget.get_cpu_insns_consumed().unwrap_or(0);
     let mem_bytes = budget.get_mem_bytes_consumed().unwrap_or(0);
 
@@ -724,7 +707,7 @@ fn main() {
                     ),
                 };
 
-            let categorized_events = match host.get_events() {
+            let categorized_events = match sim_host.inner.get_events() {
                 Ok(evs) => categorize_events(&evs, Some(cpu_insns), Some(mem_bytes)),
                 Err(_) => vec![],
             };
@@ -742,7 +725,7 @@ fn main() {
                     final_logs.push(format!("First linked SnapshotID: {snapshot_id}"));
                 }
             }
-            let contract_debug_logs: Vec<String> = match host.get_events() {
+            let contract_debug_logs: Vec<String> = match sim_host.inner.get_events() {
                 Ok(ref evs) => debug_host_fn::extract_debug_logs(evs)
                     .into_iter()
                     .map(|msg| format!("[debug] {}", msg))
@@ -872,7 +855,7 @@ fn main() {
                 format!("Memory Bytes Used: {}", mem_bytes),
             ];
 
-            let _categorized_events = match host.get_events() {
+            let _categorized_events = match sim_host.inner.get_events() {
                 Ok(evs) => categorize_events(&evs, Some(cpu_insns), Some(mem_bytes)),
                 Err(_) => vec![],
             };
