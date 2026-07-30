@@ -5,9 +5,11 @@ pub mod decompress;
 pub mod types;
 pub mod validate;
 
+#[allow(unused_imports)]
 pub use types::{emit_chunk_frame, emit_chunk_raw, stream_to_stdout, IpcError, ResponseStreamer};
 
 /// Default chunk target size (64 KiB) for streaming large simulation responses.
+#[allow(dead_code)]
 pub const DEFAULT_CHUNK_TARGET: usize = 64 * 1024;
 
 /// Binds a TCP listener to `addr` and returns it.

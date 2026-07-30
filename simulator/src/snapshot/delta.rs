@@ -166,15 +166,16 @@ impl DeltaSnapshot {
     /// [`LedgerSnapshot::to_bytes`] for platform stability. Keys and
     /// entries are stored as their canonical XDR byte representations.
     pub fn to_bytes(&self) -> Result<Vec<u8>, SnapshotError> {
-        let to_wire_entry = |(key, entry): (&Vec<u8>, &LedgerEntry)| -> Result<DeltaWireEntry, SnapshotError> {
-            let entry_bytes = entry
-                .to_xdr(Limits::none())
-                .map_err(|e| SnapshotError::XdrEncoding(format!("Failed to encode entry: {e}")))?;
-            Ok(DeltaWireEntry {
-                key: key.clone(),
-                entry_bytes,
-            })
-        };
+        let to_wire_entry =
+            |(key, entry): (&Vec<u8>, &LedgerEntry)| -> Result<DeltaWireEntry, SnapshotError> {
+                let entry_bytes = entry.to_xdr(Limits::none()).map_err(|e| {
+                    SnapshotError::XdrEncoding(format!("Failed to encode entry: {e}"))
+                })?;
+                Ok(DeltaWireEntry {
+                    key: key.clone(),
+                    entry_bytes,
+                })
+            };
 
         let mut inserted: Vec<DeltaWireEntry> = self
             .inserted
@@ -520,7 +521,10 @@ mod tests {
                 .unwrap_or_else(|| panic!("missing key {key:?}"));
             let actual_bytes = actual.to_xdr(Limits::none()).unwrap();
             let expected_bytes = expected_entry.to_xdr(Limits::none()).unwrap();
-            assert_eq!(actual_bytes, expected_bytes, "entry mismatch for key {key:?}");
+            assert_eq!(
+                actual_bytes, expected_bytes,
+                "entry mismatch for key {key:?}"
+            );
         }
     }
 
