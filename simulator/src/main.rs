@@ -450,7 +450,6 @@ fn main() {
 
     let mut pprof_guard = profiler::PprofGuard::start(99);
 
-
     let mut buffer = String::new();
     if let Err(e) = io::stdin().read_to_string(&mut buffer) {
         let pprof_b64 = pprof_guard
