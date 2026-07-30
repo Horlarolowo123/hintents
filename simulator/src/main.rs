@@ -723,7 +723,7 @@ fn main() {
     let mut pprof_profile_b64 = None;
     if let Some(ref output_path) = request.pprof_output_path {
         if let Some(bytes) = pprof_guard.stop() {
-            if let Err(e) = profiler::PprofGuard::write_file(&bytes, output_path.as_ref()) {
+            if let Err(e) = profiler::write_file(&bytes, output_path.as_ref()) {
                 eprintln!("Failed to write pprof file: {e}");
             } else {
                 tracing::info!(event = "pprof_written", path = %output_path, "pprof profile written");
