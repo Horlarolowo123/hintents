@@ -492,7 +492,7 @@ mod contract_execution_tests {
 
         // Create empty operations vector
         let operations: VecM<Operation, 100> = VecM::default();
-        let host = soroban_env_host::Host::default();
+        let sim_host = crate::runner::SimHost::new(None, None, None);
         let mut coverage = CoverageTracker::default();
 
         // Should succeed with empty operations
@@ -524,7 +524,7 @@ mod contract_execution_tests {
             enable_asset_safety: false,
             pprof_output_path: None,
         };
-        let result = execute_operations(&host, &operations, &request, None, &mut coverage);
+        let result = execute_operations(&sim_host, &operations, &request, None, &mut coverage);
         assert!(result.is_ok());
 
         let logs = result.unwrap();
