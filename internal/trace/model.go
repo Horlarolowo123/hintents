@@ -596,7 +596,7 @@ func (m Model) viewTracePane(width, height int) string {
 		fn := state.Function
 		errSuffix := ""
 		if state.Error != "" {
-			errSuffix = " " + styleError.Render("✗")
+			errSuffix = " " + styleError.Render("[FAIL]")
 		}
 
 		matchSuffix := ""
