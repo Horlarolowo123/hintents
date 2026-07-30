@@ -1,39 +1,54 @@
 // Copyright 2026 Erst Users
 // SPDX-License-Identifier: Apache-2.0
 
-// Package trace provides interactive terminal UI for exploring Soroban
-// execution traces. tui.go is the thin entry-point that wires a Model to a
-// bubbletea program; all state logic lives in model.go.
-
 package trace
 
-import (
-	"fmt"
+import "fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
-)
+// BuildTraceTree converts a flat execution trace into a collapsible tree where
+// cross-contract transitions become nested children.
+func BuildTraceTree(trace *ExecutionTrace) *TraceNode {
+	if trace == nil {
+		return NewTraceNode("root", "trace")
+	}
+	return trace.BuildTraceTree()
+}
 
-// RunTUI launches the bubbletea-based interactive trace viewer for the given
-// ExecutionTrace. It blocks until the user quits and returns any terminal or
-// I/O error encountered during the session.
-//
-// Usage:
-//
-//	if err := trace.RunTUI(myTrace); err != nil {
-//	    log.Fatal(err)
-//	}
-func RunTUI(t *ExecutionTrace) error {
-	if t == nil {
-		return fmt.Errorf("RunTUI: trace must not be nil")
+// BuildTraceTree converts the execution trace into a collapsible tree view.
+func (t *ExecutionTrace) BuildTraceTree() *TraceNode {
+	root := NewTraceNode("root", "trace")
+	root.Expanded = true
+
+	if t == nil || len(t.States) == 0 {
+		return root
 	}
 
-	m := NewModel(t)
-	p := tea.NewProgram(
-		m,
-		tea.WithAltScreen(),       // use the terminal alternate screen buffer
-		tea.WithMouseCellMotion(), // enable mouse support for future expansion
-	)
+	var previous *TraceNode
+	for i, state := range t.States {
+		node := NewTraceNode(fmt.Sprintf("step-%d", i), "state")
+		node.ContractID = state.ContractID
+		node.Function = state.Function
+		node.Error = state.Error
+		node.EventData = state.Operation
+		switch {
+		case state.EventType != "":
+			node.Type = state.EventType
+		case state.ContractID != "":
+			node.Type = "contract_call"
+		}
 
-	_, err := p.Run()
-	return err
+		if previous == nil {
+			root.AddChild(node)
+		} else if previous.ContractID != "" && state.ContractID != "" && state.ContractID != previous.ContractID {
+			previous.AddChild(node)
+		} else if previous.Parent != nil {
+			previous.Parent.AddChild(node)
+		} else {
+			root.AddChild(node)
+		}
+
+		previous = node
+	}
+
+	return root
 }
