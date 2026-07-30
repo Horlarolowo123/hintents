@@ -162,6 +162,7 @@ fn emit_panic_response(
         wasm_offset: None,
         linear_memory_dump: None,
         asset_anomalies: vec![],
+        pprof_profile: None,
     };
     if let Ok(json) = serde_json::to_string(&response) {
         println!("{}", json);
