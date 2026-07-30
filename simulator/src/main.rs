@@ -25,8 +25,8 @@ use crate::source_mapper::SourceMapper;
 use crate::stack_trace::WasmStackTrace;
 use crate::types::*;
 use base64::Engine as _;
-use soroban_env_host::xdr::{ReadXdr, WriteXdr};
 use soroban_env_host::xdr::{Operation, OperationBody};
+use soroban_env_host::xdr::{ReadXdr, WriteXdr};
 use std::any::Any;
 use std::collections::HashMap;
 use std::env;
@@ -646,12 +646,7 @@ fn main() {
     // Wrap the operation execution in panic protection
     let mut coverage = CoverageTracker::default();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        execute_operations(
-            &sim_host,
-            operations,
-            &request,
-            &mut coverage,
-        )
+        execute_operations(&sim_host, operations, &request, &mut coverage)
     }));
 
     let mut lcov_report = None;
