@@ -1,10 +1,6 @@
 // Copyright 2026 Erst Users
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(dead_code)]
-
-pub mod delta;
-
 //! Ledger snapshot and storage loading utilities for Soroban simulation.
 //!
 //! This module provides reusable functionality for:
@@ -14,6 +10,10 @@ pub mod delta;
 //!
 //! These utilities can be shared across different Soroban tools that need
 //! to reconstruct ledger state for simulation or analysis purposes.
+
+#![allow(dead_code)]
+
+pub mod delta;
 
 use base64::Engine;
 use bincode::Options;
@@ -1055,9 +1055,7 @@ mod tests {
         let mut after = LedgerSnapshot::new();
         // Insert a different entry under the same key
         let mut different = create_dummy_ledger_entry();
-        use soroban_env_host::xdr::{
-            AccountEntry, LedgerEntryData, SequenceNumber, Thresholds,
-        };
+        use soroban_env_host::xdr::{LedgerEntryData, SequenceNumber};
         if let LedgerEntryData::Account(ref mut acc) = different.data {
             acc.balance = 9999;
             acc.seq_num = SequenceNumber(99);
