@@ -524,7 +524,7 @@ mod contract_execution_tests {
             enable_asset_safety: false,
             pprof_output_path: None,
         };
-        let result = execute_operations(&sim_host, &operations, &request, None, &mut coverage);
+        let result = execute_operations(&sim_host, &operations, &request, &mut coverage);
         assert!(result.is_ok());
 
         let logs = result.unwrap();

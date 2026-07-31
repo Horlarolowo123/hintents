@@ -10,6 +10,7 @@ mod events;
 mod gas_optimizer;
 mod git_detector;
 mod ipc;
+mod memory;
 mod profiler;
 mod runner;
 mod snapshot;
@@ -25,11 +26,8 @@ use crate::source_mapper::SourceMapper;
 use crate::stack_trace::WasmStackTrace;
 use crate::types::*;
 use base64::Engine as _;
+use soroban_env_host::xdr::{Operation, OperationBody};
 use soroban_env_host::xdr::{ReadXdr, WriteXdr};
-use soroban_env_host::{
-    xdr::{Operation, OperationBody},
-    Host,
-};
 use std::any::Any;
 use std::collections::HashMap;
 use std::env;
@@ -226,19 +224,6 @@ fn generate_lcov_report(coverage: &CoverageTracker, source_file: &str) -> String
     report
 }
 
-fn check_memory_limit_or_panic(host: &Host, memory_limit: Option<u64>) {
-    if let Some(limit) = memory_limit {
-        if let Ok(mem_bytes) = host.budget_cloned().get_mem_bytes_consumed() {
-            if mem_bytes > limit {
-                panic!(
-                    "{}: consumed {} bytes, limit {} bytes",
-                    ERR_MEMORY_LIMIT_EXCEEDED, mem_bytes, limit
-                );
-            }
-        }
-    }
-}
-
 fn load_ledger_entries(
     sim_host: &mut runner::SimHost,
     entries: &HashMap<String, String>,
@@ -261,12 +246,10 @@ fn execute_operations(
     sim_host: &runner::SimHost,
     operations: &[Operation],
     request: &SimulationRequest,
-    memory_limit: Option<u64>,
     coverage: &mut CoverageTracker,
 ) -> Result<Vec<String>, crate::runner::SimHostError> {
     let mut logs = Vec::new();
-    let host = &sim_host.inner;
-    check_memory_limit_or_panic(host, memory_limit);
+    sim_host.check_memory_limit();
     for op in operations {
         coverage.record_operation(op);
         match &op.body {
@@ -290,14 +273,14 @@ fn execute_operations(
 
                 let val = sim_host.invoke_function(invoke_op.host_function.clone())?;
                 logs.push(format!("Result: {val:?}"));
-                check_memory_limit_or_panic(host, memory_limit);
+                sim_host.check_memory_limit();
             }
             _ => {
                 logs.push(format!(
                     "Skipping non-Soroban operation: {:?}",
                     op.body.name()
                 ));
-                check_memory_limit_or_panic(host, memory_limit);
+                sim_host.check_memory_limit();
             }
         }
     }
@@ -664,13 +647,7 @@ fn main() {
     // Wrap the operation execution in panic protection
     let mut coverage = CoverageTracker::default();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        execute_operations(
-            &sim_host,
-            operations,
-            &request,
-            request.memory_limit,
-            &mut coverage,
-        )
+        execute_operations(&sim_host, operations, &request, &mut coverage)
     }));
 
     let mut lcov_report = None;
