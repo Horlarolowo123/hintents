@@ -22,24 +22,23 @@ import (
 
 // InteractiveViewer provides a terminal-based interactive trace navigation interface
 type InteractiveViewer struct {
-	trace        *ExecutionTrace
-	reader       *bufio.Reader
-	eventFilter  string   // one of EventTypeTrap, EventTypeContractCall, EventTypeHostFunction, EventTypeAuth, or ""
-	filterCycle  []string // order for cycling: off, trap, contract_call, host_function, auth
-	hideStdLib   bool
-	forked       bool
-	forkStep     int
-	forkParams   map[string]string
-	trap         *TrapInfo
-	dwarfParser  *dwarf.Parser
-	navHistory   *NavigatorHistory // undo stack for Ctrl+Z navigation
-	stateMu      sync.RWMutex
-	stateCache   map[int]*ExecutionState
-	fetching     map[int]bool
-	fetchErr     map[int]string
-	fetchCh      chan fetchedState
-	fetchDelay   time.Duration
-	searchEngine *SearchEngine
+	trace       *ExecutionTrace
+	reader      *bufio.Reader
+	eventFilter string   // one of EventTypeTrap, EventTypeContractCall, EventTypeHostFunction, EventTypeAuth, or ""
+	filterCycle []string // order for cycling: off, trap, contract_call, host_function, auth
+	hideStdLib  bool
+	forked      bool
+	forkStep    int
+	forkParams  map[string]string
+	trap        *TrapInfo
+	dwarfParser *dwarf.Parser
+	navHistory  *NavigatorHistory // undo stack for Ctrl+Z navigation
+	stateMu     sync.RWMutex
+	stateCache  map[int]*ExecutionState
+	fetching    map[int]bool
+	fetchErr    map[int]string
+	fetchCh     chan fetchedState
+	fetchDelay  time.Duration
 }
 
 type fetchedState struct {
@@ -51,16 +50,15 @@ type fetchedState struct {
 // NewInteractiveViewer creates a new interactive trace viewer
 func NewInteractiveViewer(trace *ExecutionTrace) *InteractiveViewer {
 	viewer := &InteractiveViewer{
-		trace:        trace,
-		reader:       bufio.NewReader(os.Stdin),
-		eventFilter:  "",
-		filterCycle:  []string{"", EventTypeTrap, EventTypeContractCall, EventTypeHostFunction, EventTypeAuth},
-		navHistory:   NewNavigatorHistory(),
-		stateCache:   make(map[int]*ExecutionState),
-		fetching:     make(map[int]bool),
-		fetchErr:     make(map[int]string),
-		fetchCh:      make(chan fetchedState, 32),
-		searchEngine: NewSearchEngine(),
+		trace:       trace,
+		reader:      bufio.NewReader(os.Stdin),
+		eventFilter: "",
+		filterCycle: []string{"", EventTypeTrap, EventTypeContractCall, EventTypeHostFunction, EventTypeAuth},
+		navHistory:  NewNavigatorHistory(),
+		stateCache:  make(map[int]*ExecutionState),
+		fetching:    make(map[int]bool),
+		fetchErr:    make(map[int]string),
+		fetchCh:     make(chan fetchedState, 32),
 	}
 
 	// Detect any traps in the trace
@@ -73,16 +71,15 @@ func NewInteractiveViewer(trace *ExecutionTrace) *InteractiveViewer {
 // NewInteractiveViewerWithWASM creates a new interactive trace viewer with WASM data for local variable inspection
 func NewInteractiveViewerWithWASM(trace *ExecutionTrace, wasmData []byte) *InteractiveViewer {
 	viewer := &InteractiveViewer{
-		trace:        trace,
-		reader:       bufio.NewReader(os.Stdin),
-		eventFilter:  "",
-		filterCycle:  []string{"", EventTypeTrap, EventTypeContractCall, EventTypeHostFunction, EventTypeAuth},
-		navHistory:   NewNavigatorHistory(),
-		stateCache:   make(map[int]*ExecutionState),
-		fetching:     make(map[int]bool),
-		fetchErr:     make(map[int]string),
-		fetchCh:      make(chan fetchedState, 32),
-		searchEngine: NewSearchEngine(),
+		trace:       trace,
+		reader:      bufio.NewReader(os.Stdin),
+		eventFilter: "",
+		filterCycle: []string{"", EventTypeTrap, EventTypeContractCall, EventTypeHostFunction, EventTypeAuth},
+		navHistory:  NewNavigatorHistory(),
+		stateCache:  make(map[int]*ExecutionState),
+		fetching:    make(map[int]bool),
+		fetchErr:    make(map[int]string),
+		fetchCh:     make(chan fetchedState, 32),
 	}
 
 	// Initialize DWARF parser if WASM data is provided
@@ -200,38 +197,10 @@ func (v *InteractiveViewer) handleCommand(command string) bool {
 		return false
 	}
 
-	// Handle '/' to start fuzzy search
-	if cmdExact == "/" {
-		v.handleSearch()
-		return false
-	}
-
-	// Handle 'N' for previous search match (uppercase only)
-	if cmdExact == "N" {
-		if v.searchEngine.MatchCount() > 0 {
-			match := v.searchEngine.PreviousMatch()
-			if match != nil {
-				v.jumpToStep(strconv.Itoa(match.NodeIndex))
-				fmt.Printf("%s Previous match (%d/%d)\n", visualizer.Symbol("arrow_l"), v.searchEngine.CurrentMatchNumber(), v.searchEngine.MatchCount())
-			}
-		} else {
-			fmt.Printf("%s No active search. Use '/' to start search.\n", visualizer.Error())
-		}
-		return false
-	}
-
 	switch cmd {
 	case "n", "next", "forward":
-		if v.searchEngine.MatchCount() > 0 {
-			match := v.searchEngine.NextMatch()
-			if match != nil {
-				v.jumpToStep(strconv.Itoa(match.NodeIndex))
-				fmt.Printf("%s Next match (%d/%d)\n", visualizer.Symbol("arrow_r"), v.searchEngine.CurrentMatchNumber(), v.searchEngine.MatchCount())
-			}
-		} else {
-			v.navHistory.Push(v.trace.CurrentStep)
-			v.stepForward()
-		}
+		v.navHistory.Push(v.trace.CurrentStep)
+		v.stepForward()
 	case "b", "p", "prev", "back", "backward":
 		v.navHistory.Push(v.trace.CurrentStep)
 		v.stepBackward()
@@ -285,13 +254,6 @@ func (v *InteractiveViewer) handleCommand(command string) bool {
 		return true
 	case "rewind":
 		v.rewindToStart()
-	case "clear", "esc":
-		if v.searchEngine.MatchCount() > 0 {
-			v.searchEngine.SetQuery("")
-			fmt.Printf("%s Search cleared\n", visualizer.Symbol("check"))
-		} else {
-			fmt.Println("No active search to clear")
-		}
 	case "y", "yank", "copy":
 		if len(parts) > 1 {
 			v.handleYank(parts[1:])
@@ -314,7 +276,6 @@ func (v *InteractiveViewer) rewindToStart() {
 
 	v.trace.CurrentStep = 0
 	v.eventFilter = ""
-	v.searchEngine.SetQuery("")
 
 	state, err := v.trace.GetCurrentState()
 	if err != nil {
@@ -1053,9 +1014,9 @@ func (v *InteractiveViewer) showHelp() {
 	fmt.Println("  t, trap              - Show trap details")
 	fmt.Println()
 	fmt.Println("Search:")
-	fmt.Println("  /                    - Start fuzzy search (ctrl+p style)")
-	fmt.Println("  n / N                - Next/previous match (when search active)")
-	fmt.Println("  clear, esc            - Clear search")
+	fmt.Println("  /                    - Start search")
+	fmt.Println("  n / N                - Next/previous match")
+	fmt.Println("  ESC                  - Clear search")
 	fmt.Println()
 	fmt.Println("Other:")
 	fmt.Println("  d, diff              - Side-by-side variable diff (current vs previous step)")
@@ -1115,52 +1076,4 @@ func (v *InteractiveViewer) handleYank(args []string) {
 	}
 
 	fmt.Printf("%s Copied raw XDR to clipboard\n", visualizer.Symbol("sparkles"))
-}
-
-// handleSearch prompts for a search query and performs fuzzy search
-func (v *InteractiveViewer) handleSearch() {
-	fmt.Print("Search (fuzzy): ")
-	query, err := v.reader.ReadString('\n')
-	if err != nil {
-		fmt.Printf("%s Failed to read search query: %v\n", visualizer.Error(), err)
-		return
-	}
-
-	query = strings.TrimSpace(query)
-	if query == "" {
-		fmt.Println("Search cancelled")
-		return
-	}
-
-	// Convert states to TraceNodes for searching
-	nodes := make([]*TraceNode, len(v.trace.States))
-	for i, state := range v.trace.States {
-		nodes[i] = &TraceNode{
-			ID:         strconv.Itoa(i),
-			ContractID: state.ContractID,
-			Function:   state.Function,
-			Error:      state.Error,
-			EventData:  state.Operation,
-			Type:       ClassifyEventType(&state),
-		}
-	}
-
-	// Perform fuzzy search
-	v.searchEngine.SetQuery(query)
-	matches := v.searchEngine.Search(nodes)
-
-	if len(matches) == 0 {
-		fmt.Printf("%s No matches found for: %s\n", visualizer.Error(), query)
-		return
-	}
-
-	fmt.Printf("%s Found %d match(es) for: %s\n", visualizer.Symbol("check"), len(matches), query)
-	fmt.Println("Use 'n' for next match, 'N' for previous match")
-
-	// Jump to first match
-	firstMatch := v.searchEngine.CurrentMatch()
-	if firstMatch != nil {
-		v.jumpToStep(strconv.Itoa(firstMatch.NodeIndex))
-		fmt.Printf("%s Jumped to first match (step %d)\n", visualizer.Symbol("target"), firstMatch.NodeIndex)
-	}
 }
