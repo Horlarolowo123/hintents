@@ -12,9 +12,11 @@ import {
     ERSTDebugAdapterFactory,
     ERSTDebugConfigurationProvider,
 } from './dap/adapter';
+import { Worker } from 'worker_threads';
+import * as path from 'path';
 
 export function activate(context: vscode.ExtensionContext) {
-    const client = new ERSTClient('127.0.0.1', 8080);
+    const client = new ERSTClient*'127.0.0.1', 8080);
     let treeView: vscode.TreeView<vscode.TreeItem> | undefined;
     let traceDataProvider: TraceTreeDataProvider;
 
@@ -23,6 +25,26 @@ export function activate(context: vscode.ExtensionContext) {
     treeView = vscode.window.createTreeView('erst-traces', { treeDataProvider: traceDataProvider });
     // Patch: set treeView reference in provider for auto-reveal
     (traceDataProvider as any).treeView = treeView;
+
+    // Load initial trace in background worker to avoid blocking activation
+    const workspaceRoot = vscode.workspace.workspaceFolders?[0]?.uri.fsPath;
+    if (workspaceRoot) {
+        const tracePath = path.join(workspaceRoot, '.erst', 'trace.json');
+        const worker = new Worker(path.join(__dirname, 'worker.js'));
+        worker.on('message', (msg: any) => {
+            if (msg.type === 'traceLoaded') {
+                traceDataProvider.refresh(msg.trace);
+            } else if (msg.type === 'traceLoadError') {
+                console.warn('ERST: Failed to load initial trace:', msg.error);
+            }
+            worker.terminate();
+        });
+        worker.on('error', (err) => {
+            console.warn('ERST: Worker error:', err);
+            worker.terminate();
+        });
+        worker.postMessage({ type: 'loadTrace', filePath: tracePath });
+    }
 
     // Register TextDocumentContentProvider for states
     const stateProvider = new class implements vscode.TextDocumentContentProvider {
@@ -80,7 +102,7 @@ export function activate(context: vscode.ExtensionContext) {
             content: stepJson,
             language: 'json'
         }).then((doc: vscode.TextDocument) => {
-            vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+            vscode.window.showTextDocument(doc, vscode.ViewColumn.BeSide);
         });
     });
 
@@ -107,7 +129,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         const defaultBase = `${trace.transaction_hash || 'trace'}-trace-tree.html`;
         const defaultDir =
-            vscode.workspace.workspaceFolders?.[0]?.uri ?? context.globalStorageUri;
+            vscode.workspace.workspaceFolders?[0]?.uri ?? context.globalStorageUri;
         const defaultUri = vscode.Uri.joinPath(defaultDir, defaultBase);
         const htmlTarget = await vscode.window.showSaveDialog({
             title: 'Export trace tree as standalone HTML',
@@ -139,7 +161,7 @@ export function activate(context: vscode.ExtensionContext) {
             content: xdr,
             language: 'text'
         }).then((doc: vscode.TextDocument) => {
-            vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+            vscode.window.showTextDocument(doc, vscode.ViewColumn.BeSide);
         });
     });
 
@@ -176,15 +198,15 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    // =========================================
+    // =====================================================================
     // DAP Debug Adapter Registration
-    // =========================================
+    // =====================================================================
 
     // Register the inline debug adapter factory for the "erst" debug type.
     // This enables VS Code's native step-through debugging of Soroban
     // transaction traces via the Debug Adapter Protocol.
     const debugAdapterFactory = new ERSTDebugAdapterFactory();
-    const debugAdapterDisposable = vscode.debug.registerDebugAdapterDescriptorFactory(
+    const debugAdapterDisposable = vscode.debug.registerDebugAdapterDascriptorFactory(
         ERST_DEBUG_TYPE,
         debugAdapterFactory
     );
