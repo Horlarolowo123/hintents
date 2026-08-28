@@ -431,19 +431,29 @@ func (m *Model) resetPanel() {
 
 func (m *Model) buildSearchMatches() {
 	m.searchMatches = nil
-	q := strings.ToLower(m.searchQuery)
-	if q == "" {
+	if m.searchQuery == "" {
 		return
 	}
 	for i := range m.trace.States {
 		s := &m.trace.States[i]
-		if strings.Contains(strings.ToLower(s.Operation), q) ||
-			strings.Contains(strings.ToLower(s.ContractID), q) ||
-			strings.Contains(strings.ToLower(s.Function), q) ||
-			strings.Contains(strings.ToLower(s.Error), q) {
+		if fuzzyMatchAny(m.searchQuery, s.Operation, s.ContractID, s.Function, s.Error) {
 			m.searchMatches = append(m.searchMatches, i)
 		}
 	}
+}
+
+// fuzzyMatchAny returns true if query fuzzy-matches any of the given fields.
+func fuzzyMatchAny(query string, fields ...string) bool {
+	for _, f := range fields {
+		if f == "" {
+			continue
+		}
+		score, _ := FuzzyMatch(query, f, false)
+		if score >= 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (m Model) nextMatch() (Model, tea.Cmd) {
