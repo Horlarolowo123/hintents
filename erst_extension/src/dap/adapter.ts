@@ -161,6 +161,9 @@ export class ERSTDebugSession implements vscode.DebugAdapter {
                 case 'stepOut':
                     this.handleStepOut(request);
                     break;
+                case 'stepBack':
+                    this.handleStepBack(request);
+                    break;
                 case 'pause':
                     this.handlePause(request);
                     break;
@@ -590,6 +593,36 @@ export class ERSTDebugSession implements vscode.DebugAdapter {
             success: true,
             command: 'stepOut',
         } as DebugProtocol.StepOutResponse);
+
+        this.sendStoppedEvent('step');
+    }
+
+    private handleStepBack(request: DebugProtocol.StepBackRequest): void {
+        if (!this.trace || this.currentStepIndex <= 0) {
+            this.sendMessage({
+                type: 'response',
+                request_seq: request.seq,
+                success: true,
+                command: 'stepBack',
+            } as DebugProtocol.StepBackResponse);
+            return;
+        }
+
+        this.currentStepIndex--;
+        const step = this.trace.states[this.currentStepIndex];
+
+        // Log step info
+        this.sendEventMessage(
+            'stdout',
+            `ERST: Stepped back to ${this.currentStepIndex + 1}/${this.trace.states.length}: ${step.operation}${step.function ? ` (${step.function})` : ''}\n`
+        );
+
+        this.sendMessage({
+            type: 'response',
+            request_seq: request.seq,
+            success: true,
+            command: 'stepBack',
+        } as DebugProtocol.StepBackResponse);
 
         this.sendStoppedEvent('step');
     }
